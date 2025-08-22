@@ -361,3 +361,17 @@ read -p "Install additional packages? (y/n): " install_additional_packages
 if [ "$install_additional_packages" == "y" ]; then
     yay -Syu --noconfirm obs-studio qt5ct vlc vlc-plugins-all discord thunar visual-studio-code-bin bauh htop flatseal libreoffice-fresh 
 fi
+
+echo "done"
+
+echo "would you like to install any other packages? (y/n)"
+
+echo "say the packages names"
+read -p "Install other packages? (y/n): " install_other_packages
+
+if [ "$install_other_packages" == "y" ]; then
+    read -p "Enter the package names (space-separated): " other_packages
+    yay -Syu --noconfirm $other_packages
+fi
+
+echo "please restart"
