@@ -1,377 +1,201 @@
-#!/usr/bin/bash
+#!/usr/bin/env bash
 
-#check if user is root or had sudo and if it is it will close the script
+# =============================================
+#   AserDev Arch -> AserDevOS Transformation 😎
+# =============================================
 
-set -e 
+set -e
+
+# Colors 🎨
+RED="\e[31m"
+GREEN="\e[32m"
+YELLOW="\e[33m"
+CYAN="\e[36m"
+RESET="\e[0m"
+
+# Pretty echo
+msg() { echo -e "${CYAN}[*]${RESET} $1"; }
+ok() { echo -e "${GREEN}[✔]${RESET} $1"; }
+warn() { echo -e "${YELLOW}[!]${RESET} $1"; }
+err() { echo -e "${RED}[✘]${RESET} $1"; }
+
+# Spinner 🌀
+spinner() {
+    local pid=$!
+    local delay=0.1
+    local spinstr='|/-\\'
+    while ps -p $pid &>/dev/null; do
+        local temp=${spinstr#?}
+        printf " [%c]  " "$spinstr"
+        local spinstr=$temp${spinstr%"$temp"}
+        sleep $delay
+        printf "\b\b\b\b\b\b"
+    done
+    printf "    \b\b\b\b"
+}
+
+run_with_spinner() {
+    ("$@") & spinner
+    wait $!
+}
 
 
+# =============================================
+# Root check
+# =============================================
 if [ "$EUID" -eq 0 ]; then
-    echo "❌ Do NOT run this as root!"
+    err "Do NOT run this as root! Run as a normal user with sudo."
     exit 1
 fi
 
-echo "next section"
+msg "Welcome to the ${YELLOW}AserDevOS Installer${RESET}!"
+read -p "⚠️  This will heavily modify your system. Continue? (y/n): " confirm
+[[ "$confirm" != "y" ]] && exit 1
 
-# updating
-
-echo "updating your os"
-
-sudo pacman -Syu --noconfirm 
-
-
-if [ $? -eq 0 ]; then
-    echo "✅ updated"
-else
-    echo "❌ retrying"
-    sudo pacman -Syu --noconfirm
-    if [ $? -eq 0 ]; then
-        echo "✅ updated"
+# =============================================
+# Safe Pacman Install Function
+# =============================================
+install_pkgs() {
+    local packages="$@"
+    msg "Installing: $packages"
+    if run_with_spinner sudo pacman -S --needed --noconfirm $packages; then
+        ok "$packages installed."
     else
-        echo "❌ failed to update please find a source of stable wifi"
+        err "Failed to install $packages"
         exit 1
     fi
+}
+
+# =============================================
+# Update System
+# =============================================
+msg "Updating system..."
+run_with_spinner sudo pacman -Syu --noconfirm && ok "System updated!"
+
+# =============================================
+# Base Dependencies
+# =============================================
+install_pkgs git figlet wget curl vim nano man base-devel aria2 yt-dlp jdk-openjdk rust bash base
+
+# =============================================
+# Desktop Environments
+# =============================================
+msg "Choose your Desktop Environment:" 
+echo -e "1) KDE\n2) Gnome\n3) XFCE\n4) Hyprland\n5) Skip"
+read -p "Enter number: " de
+
+case $de in
+    1) install_pkgs plasma sddm && run_with_spinner sudo systemctl enable sddm && ok "KDE Ready";;
+    2) install_pkgs gnome gdm && run_with_spinner sudo systemctl enable gdm && ok "Gnome Ready";;
+    3) install_pkgs xfce4 xfce4-goodies lightdm && run_with_spinner sudo systemctl enable lightdm && ok "XFCE Ready";;
+    4) install_pkgs hyprland sddm hyprpaper waybar swaync xdg-desktop-portal xdg-desktop-portal-hyprland && run_with_spinner sudo systemctl enable sddm && ok "Hyprland Ready";;
+    5) warn "Skipping DE installation";;
+    *) warn "Invalid option, skipping.";;
+esac
+
+# =============================================
+# OS Rename (Backup First)
+# =============================================
+msg "Renaming OS to AserDevOS"
+sudo cp /etc/os-release /etc/os-release.bak
+wget -q https://raw.githubusercontent.com/aserdevyt/aserdev-os/refs/heads/main/os-release -O os-release
+sudo cp os-release /etc/os-release && ok "OS Renamed (backup at /etc/os-release.bak)"
+
+# =============================================
+# Yay Setup
+# =============================================
+if ! command -v yay &>/dev/null; then
+    msg "Installing yay (AUR helper)"
+    git clone https://aur.archlinux.org/yay.git && cd yay && run_with_spinner makepkg -si --noconfirm && cd .. && rm -rf yay
+    ok "yay installed"
+else
+    ok "yay already installed"
 fi
 
-sudo pacman -S --noconfirm --needed git figlet wget curl vi vim nano  base-devel
+# =============================================
+# Shells
+# =============================================
+msg "Choose your shell:"
+echo -e "1) zsh\n2) fish\n3) ash-shell (experimental)\n4) bash\n5) Skip"
+read -p "Enter number: " shell_choice
 
-if [ $? -eq 0 ]; then
-    echo "✅ installed dependencies"
-else
-    echo "❌ failed to install dependencies"
-    sudo pacman -S --noconfirm --needed git figlet wget curl vi vim nano  man base-devel
-    if [ $? -eq 0 ]; then
-        echo "✅ installed dependencies"
-    else
-        echo "❌ failed to install dependencies"
-        exit 1
-    fi
-fi
+case $shell_choice in
+    1)
+        install_pkgs zsh
+        run_with_spinner chsh -s /usr/bin/zsh
+        sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+        git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k
+        git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
+        git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
+        sed -i 's/^ZSH_THEME=.*/ZSH_THEME="powerlevel10k\/powerlevel10k"/' ~/.zshrc
+        sed -i 's/^plugins=(.*/plugins=(git zsh-autosuggestions zsh-syntax-highlighting)/' ~/.zshrc
+        ok "zsh with oh-my-zsh + plugins installed";;
+    2) install_pkgs fish && run_with_spinner chsh -s /usr/bin/fish && ok "fish set!";;
+    3) yay -S --noconfirm ash-shell-git && run_with_spinner chsh -s /usr/bin/ash && ok "ash-shell set!";;
+    4) install_pkgs bash && run_with_spinner chsh -s /usr/bin/bash && ok "bash set!";;
+    5) warn "Keeping current shell.";;
+    *) warn "Invalid choice, keeping current shell.";;
+esac
 
-echo "next section" 
-
-figlet "installation"
-
-echo "installing alot of packages"
-
-sudo pacman -Syu --noconfirm --needed git figlet wget curl vi vim nano  man base-devel aria2 yt-dlp jdk-openjdk rust bash base 
-
-if [ $? -eq 0 ]; then
-    echo "✅ installed packages"
-else
-    echo "❌ failed to install packages"
-    sudo pacman -Syu --noconfirm --needed git figlet wget curl vi vim nano  man base-devel aria2 yt-dlp jdk-openjdk rust bash base
-    if [ $? -eq 0 ]; then
-        echo "✅ installed packages"
-    else
-        echo "❌ failed to install packages"
-        exit 1
-    fi
-fi
-
-echo "next section"
-
-figlet "configs"
-
-desktop_environment=""
-
-
-echo "choose your de"
-echo "1) KDE"
-echo "2) Gnome"
-echo "3) XFCE"
-echo "4) hyprland"
-
-read desktop_environment
-
-
-
-if [ "$desktop_environment" == "1" ]; then
-    echo "You have selected KDE"
-    sudo pacman -Syu --noconfirm --needed plasma sddm 
-    sudo systemctl enable sddm
-    if [ $? -eq 0 ]; then
-        echo "✅ KDE installed successfully"
-    else
-        echo "❌ Failed to install KDE"
-        exit 1
-    fi
-elif [ "$desktop_environment" == "2" ]; then
-    echo "You have selected Gnome"
-    sudo pacman -Syu --noconfirm --needed gnome gdm
-    sudo systemctl enable gdm
-    if [ $? -eq 0 ]; then
-        echo "✅ Gnome installed successfully"
-    else
-        echo "❌ Failed to install Gnome"
-        exit 1
-    fi
-elif [ "$desktop_environment" == "3" ]; then
-    echo "You have selected XFCE"
-    sudo pacman -Syu --noconfirm --needed xfce4 xfce4-goodies lightdm
-    sudo systemctl enable lightdm
-    if [ $? -eq 0 ]; then
-        echo "✅ XFCE installed successfully"
-    else
-        echo "❌ Failed to install XFCE"
-        exit 1
-    fi
-elif [ "$desktop_environment" == "4" ]; then
-    echo "You have selected Hyprland"
-    sudo pacman -Syu --noconfirm --needed hyprland sddm hyprpaper waybar swaync xdg-desktop-portal xdg-desktop-portal-hyprland
-    sudo systemctl enable sddm
-    if [ $? -eq 0 ]; then
-        echo "✅ Hyprland installed successfully"
-    else
-        echo "❌ Failed to install Hyprland"
-        exit 1
-    fi
-else
-    echo "Invalid selection"
-    echo "skipping using tty"
-    
-fi
- 
-echo "next section"
-
-figlet "renaming the os"
-
-wget https://raw.githubusercontent.com/aserdevyt/aserdev-os/refs/heads/main/os-release 
-
-sudo rm /etc/os-release
-
-sudo cp os-release /etc/os-release
-
-cat /etc/os-release
-
-echo "next section" 
-
-figlet "themes"
-
-echo "would you like a grub theme?"
-
-read grub_theme
-
-if [ "$grub_theme" == "yes" ]; then
-    echo "You have selected a grub theme"
-    echo "install chris titus tech temes shout out to him" 
+# =============================================
+# GRUB Theme
+# =============================================
+read -p "Install a GRUB theme? (y/n): " grub
+if [ "$grub" == "y" ]; then
+    msg "Installing GRUB theme from Chris Titus Tech repo"
     git clone https://github.com/ChrisTitusTech/Top-5-Bootloader-Themes
-    cd Top-5-Bootloader-Themes  
-    sudo ./install.sh
-    if [ $? -eq 0 ]; then
-        echo "✅ Grub theme installed successfully"
-    else
-        echo "❌ Failed to install grub theme"
-        exit 1
-    fi
-    cd ~
+    cd Top-5-Bootloader-Themes
+    run_with_spinner sudo ./install.sh
+    cd .. && rm -rf Top-5-Bootloader-Themes
+    ok "GRUB theme installed"
 else
-    echo "Skipping grub theme installation"
+    warn "Skipping GRUB theme"
 fi
 
-echo "next section"
-
-echo "would you like a plymouth theme?"
-
-read plymouth_theme
-
-if [ "$plymouth_theme" == "yes" ]; then
-    echo "You have selected a plymouth theme"
-    sudo pacman -Syu --noconfirm --needed plymouth
-    sudo sed -i 's/HOOKS=(/HOOKS=(plymouth /' /etc/mkinitcpio.conf && \
-sudo mkinitcpio -P && \
-sudo sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash /' /etc/default/grub && \
-sudo grub-mkconfig -o /boot/grub/grub.cfg && \
-sudo plymouth-set-default-theme -R spinner
-
-    if [ $? -eq 0 ]; then
-        echo "✅ Plymouth theme installed successfully"
-    else
-        echo "❌ Failed to install plymouth theme"
-        exit 1
-    fi
+# =============================================
+# Plymouth Theme
+# =============================================
+read -p "Install Plymouth splash theme? (y/n): " plymouth
+if [ "$plymouth" == "y" ]; then
+    install_pkgs plymouth
+    sudo cp /etc/mkinitcpio.conf /etc/mkinitcpio.conf.bak
+    sudo cp /etc/default/grub /etc/default/grub.bak
+    sudo sed -i 's/HOOKS=(/HOOKS=(plymouth /' /etc/mkinitcpio.conf
+    run_with_spinner sudo mkinitcpio -P
+    sudo sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash /' /etc/default/grub
+    run_with_spinner sudo grub-mkconfig -o /boot/grub/grub.cfg
+    run_with_spinner sudo plymouth-set-default-theme -R spinner
+    ok "Plymouth installed (backups at mkinitcpio.conf.bak + grub.bak)"
 else
-    echo "Skipping plymouth theme installation"
+    warn "Skipping Plymouth"
 fi
 
-echo "next section"
+# =============================================
+# Browsers
+# =============================================
+msg "Choose your browser:"
+echo -e "1) Edge\n2) Firefox\n3) Chromium\n4) Zen Browser\n5) Skip"
+read -p "Enter number: " browser
 
-figlet "aur"
+case $browser in
+    1) install_pkgs microsoft-edge-stable;;
+    2) install_pkgs firefox;;
+    3) install_pkgs chromium;;
+    4) yay -S --noconfirm zen-browser-bin;;
+    5) warn "Skipping browser.";;
+    *) warn "Invalid choice, skipping.";;
+esac
 
-git clone https://aur.archlinux.org/yay.git
+# =============================================
+# Extras
+# =============================================
+read -p "Install brokefetch? (y/n): " bro
+[[ "$bro" == "y" ]] && yay -S --noconfirm brokefetch-git
 
-cd yay
+read -p "Install GIMP + Kdenlive? (y/n): " gk
+[[ "$gk" == "y" ]] && yay -S --noconfirm gimp kdenlive
 
-makepkg -si --noconfirm
+read -p "Install extra recommended packages (obs, vlc, discord, libreoffice, etc)? (y/n): " extra
+[[ "$extra" == "y" ]] && yay -S --noconfirm obs-studio vlc discord thunar visual-studio-code-bin bauh htop flatseal libreoffice-fresh
 
-cd ~
-
-echo "next section"
-
-figlet "shell"
-
-echo "choose a shell"
-echo "1:zsh"
-echo "2:fish"
-echo "3:ash-shell(experemintal)"
-echo "4:bash"
-
-shell_choice=""
-
-read shell_choice
-
-if [ "$shell_choice" == "1" ]; then
-    echo "You have selected zsh"
-    sudo pacman -Syu --noconfirm --needed zsh
-    chsh -s /usr/bin/zsh
-    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended && \
-git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k && \
-git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-autosuggestions && \
-git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting && \
-sed -i 's/^ZSH_THEME=.*/ZSH_THEME="powerlevel10k\/powerlevel10k"/' ~/.zshrc && \
-sed -i 's/^plugins=(.*/plugins=(git zsh-autosuggestions zsh-syntax-highlighting)/' ~/.zshrc
-
-    if [ $? -eq 0 ]; then
-        echo "✅ zsh installed successfully"
-    else
-        echo "❌ Failed to install zsh"
-        exit 1
-    fi
-elif [ "$shell_choice" == "2" ]; then
-    echo "You have selected fish"
-    sudo pacman -Syu --noconfirm --needed fish
-    chsh -s /usr/bin/fish
-    if [ $? -eq 0 ]; then
-        echo "✅ fish installed successfully"
-    else
-        echo "❌ Failed to install fish"
-        exit 1
-    fi
-elif [ "$shell_choice" == "3" ]; then
-    echo "You have selected ash-shell"
-    yay -Syu --noconfirm --needed ash-shell-git
-    chsh -s /usr/bin/ash
-    if [ $? -eq 0 ]; then
-        echo "✅ ash-shell installed successfully"
-    else
-        echo "❌ Failed to install ash-shell"
-        exit 1
-    fi
-elif [ "$shell_choice" == "4" ]; then
-    echo "You have selected bash"
-    sudo pacman -Syu --noconfirm --needed bash
-    chsh -s /usr/bin/bash
-    if [ $? -eq 0 ]; then
-        echo "✅ bash installed successfully"
-    else
-        echo "❌ Failed to install bash"
-        exit 1
-    fi
-else
-    echo "Invalid selection keeping current shell"
-
-fi
-
-figlet "REPOS"
-
-
-echo "installing chaotic aur"
-
-sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com
-sudo pacman-key --lsign-key 3056513887B78AEB
-sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst'
-sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
-
-if ! grep -q "\[chaotic-aur\]" /etc/pacman.conf; then
-    echo -e "\n[chaotic-aur]\nInclude = /etc/pacman.d/chaotic-mirrorlist" | sudo tee -a /etc/pacman.conf
-    sudo pacman -Syu
-fi
-
-echo "installing blackarch"
-
-# Run https://blackarch.org/strap.sh as root and follow the instructions.
-
- curl -O https://blackarch.org/strap.sh
-# Verify the SHA1 sum
-
- echo bbf0a0b838aed0ec05fff2d375dd17591cbdf8aa strap.sh | sha1sum -c
-# Set execute bit
-
- chmod +x strap.sh
-# Run strap.sh
-
- sudo ./strap.sh
-# Enable multilib following https://wiki.archlinux.org/index.php/Official_repositories#Enabling_multilib and run:
-
- sudo pacman -Syu
-
-
-figlet packages
-
-
-echo "choose a browser"
-
-echo "1:microsoft-edge-stable(recommended)"
-echo "2:firefox"
-echo "3:chromium"
-echo "4:zen-browser"
-
-browser=""
-
-read browser
-
-if [ "$browser" == "1" ]; then
-    echo "You have selected microsoft-edge-stable"
-    sudo pacman -Syu --noconfirm --needed microsoft-edge-stable
-elif [ "$browser" == "2" ]; then
-    echo "You have selected firefox"
-    sudo pacman -Syu --noconfirm --needed firefox
-elif [ "$browser" == "3" ]; then
-    echo "You have selected chromium"
-    sudo pacman -Syu --noconfirm --needed chromium
-elif [ "$browser" == "4" ]; then
-    echo "You have selected zen-browser"
-    sudo pacman -Syu --noconfirm --needed zen-browser-bin
-else
-    echo "Invalid selection"
-    echo "no browser for you"
-fi
-
-figlet "extras"
-
-echo "would you like 'brokefetch' from 'https://github.com/Szerwigi1410/brokefetch'"
-
-read -p "Install brokefetch? (y/n): " install_brokefetch
-
-if [ "$install_brokefetch" == "y" ]; then
-    yay -Syu --noconfirm brokefetch-git
-fi
-
-
-echo "you like gimp,kdenlive?" 
-
-read -p "Install gimp and kdenlive? (y/n): " install_gimp_kdenlive
-
-if [ "$install_gimp_kdenlive" == "y" ]; then
-    yay -Syu --noconfirm gimp kdenlive
-fi
-
-echo "would you like to install any additional packages? (y/n)"
-read -p "Install additional packages? (y/n): " install_additional_packages
-
-if [ "$install_additional_packages" == "y" ]; then
-    yay -Syu --noconfirm obs-studio qt5ct vlc vlc-plugins-all discord thunar visual-studio-code-bin bauh htop flatseal libreoffice-fresh 
-fi
-
-echo "done"
-
-echo "would you like to install any other packages? (y/n)"
-
-echo "say the packages names"
-read -p "Install other packages? (y/n): " install_other_packages
-
-if [ "$install_other_packages" == "y" ]; then
-    read -p "Enter the package names (space-separated): " other_packages
-    yay -Syu --noconfirm $other_packages
-fi
-
-echo "please restart"
+msg "All done! 🎉 Please reboot your system."
