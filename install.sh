@@ -204,7 +204,7 @@ esac
 # Extras
 # =============================================
 read -p "Install brokefetch? (y/n): " bro
-[[ "$bro" == "y" ]] && yay -S --noconfirm brokefetch-git
+[[ "$bro" == "y" ]] && yay -S --noconfirm brokefetch-mod
 
 read -p "Install GIMP + Kdenlive? (y/n): " gk
 [[ "$gk" == "y" ]] && yay -S --noconfirm gimp kdenlive
