@@ -10,7 +10,7 @@ if [ "$EUID" -eq 0 ]; then
     exit 1
 fi
 
-clear
+echo "next section"
 
 # updating
 
@@ -47,7 +47,7 @@ else
     fi
 fi
 
-clear 
+echo "next section" 
 
 figlet "installation"
 
@@ -68,7 +68,7 @@ else
     fi
 fi
 
-clear
+echo "next section"
 
 figlet "configs"
 
@@ -131,7 +131,7 @@ else
     
 fi
  
-clear
+echo "next section"
 
 figlet "renaming the os"
 
@@ -143,7 +143,7 @@ sudo cp os-release /etc/os-release
 
 cat /etc/os-release
 
-clear 
+echo "next section" 
 
 figlet "themes"
 
@@ -163,11 +163,12 @@ if [ "$grub_theme" == "yes" ]; then
         echo "❌ Failed to install grub theme"
         exit 1
     fi
+    cd ~
 else
     echo "Skipping grub theme installation"
 fi
 
-clear
+echo "next section"
 
 echo "would you like a plymouth theme?"
 
@@ -192,7 +193,7 @@ else
     echo "Skipping plymouth theme installation"
 fi
 
-clear
+echo "next section"
 
 figlet "aur"
 
@@ -202,7 +203,9 @@ cd yay
 
 makepkg -si --noconfirm
 
-clear
+cd ~
+
+echo "next section"
 
 figlet "shell"
 
@@ -268,3 +271,93 @@ else
 
 fi
 
+figlet "REPOS"
+
+
+echo "installing chaotic aur"
+
+sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com
+sudo pacman-key --lsign-key 3056513887B78AEB
+sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst'
+sudo pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
+
+if ! grep -q "\[chaotic-aur\]" /etc/pacman.conf; then
+    echo -e "\n[chaotic-aur]\nInclude = /etc/pacman.d/chaotic-mirrorlist" | sudo tee -a /etc/pacman.conf
+    sudo pacman -Syu
+fi
+
+echo "installing blackarch"
+
+# Run https://blackarch.org/strap.sh as root and follow the instructions.
+
+ curl -O https://blackarch.org/strap.sh
+# Verify the SHA1 sum
+
+ echo bbf0a0b838aed0ec05fff2d375dd17591cbdf8aa strap.sh | sha1sum -c
+# Set execute bit
+
+ chmod +x strap.sh
+# Run strap.sh
+
+ sudo ./strap.sh
+# Enable multilib following https://wiki.archlinux.org/index.php/Official_repositories#Enabling_multilib and run:
+
+ sudo pacman -Syu
+
+
+figlet packages
+
+
+echo "choose a browser"
+
+echo "1:microsoft-edge-stable(recommended)"
+echo "2:firefox"
+echo "3:chromium"
+echo "4:zen-browser"
+
+browser=""
+
+read browser
+
+if [ "$browser" == "1" ]; then
+    echo "You have selected microsoft-edge-stable"
+    sudo pacman -Syu --noconfirm --needed microsoft-edge-stable
+elif [ "$browser" == "2" ]; then
+    echo "You have selected firefox"
+    sudo pacman -Syu --noconfirm --needed firefox
+elif [ "$browser" == "3" ]; then
+    echo "You have selected chromium"
+    sudo pacman -Syu --noconfirm --needed chromium
+elif [ "$browser" == "4" ]; then
+    echo "You have selected zen-browser"
+    sudo pacman -Syu --noconfirm --needed zen-browser-bin
+else
+    echo "Invalid selection"
+    echo "no browser for you"
+fi
+
+figlet "extras"
+
+echo "would you like 'brokefetch' from 'https://github.com/Szerwigi1410/brokefetch'"
+
+read -p "Install brokefetch? (y/n): " install_brokefetch
+
+if [ "$install_brokefetch" == "y" ]; then
+    yay -Syu --noconfirm brokefetch-git
+fi
+
+
+echo "you like gimp,kdenlive?" 
+
+read -p "Install gimp and kdenlive? (y/n): " install_gimp_kdenlive
+
+if [ "$install_gimp_kdenlive" == "y" ]; then
+    yay -Syu --noconfirm gimp kdenlive
+fi
+
+echo "would you like to install any additional packages? (y/n)"
+read -p "Install additional packages? (y/n): " install_additional_packages
+
+if [ "$install_additional_packages" == "y" ]; then
+    yay -Syu --noconfirm obs-studio qt5ct vlc vlc-plugins-all discord thunar visual-studio-code-bin bauh htop flatseal libreoffice-fresh 
+fi
