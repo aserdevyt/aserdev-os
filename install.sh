@@ -32,9 +32,9 @@ err() { echo -e "${RED}[✘]${RESET} $1"; }
 
 # Spinner 🌀
 spinner() {
-    local pid=$!
+    local pid=$1
     local delay=0.1
-    local spinstr='|/-\\'
+    local spinstr='|/-\'
     while ps -p $pid &>/dev/null; do
         local temp=${spinstr#?}
         printf " [%c]  " "$spinstr"
@@ -45,9 +45,12 @@ spinner() {
     printf "    \b\b\b\b"
 }
 
+
 run_with_spinner() {
-    ("$@") & spinner
-    wait $!
+    ("$@") & 
+    local pid=$!
+    spinner $pid   # <--- you need this (with $pid)
+    wait $pid
 }
 
 
