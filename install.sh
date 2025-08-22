@@ -6,6 +6,17 @@
 
 set -e
 
+set -eEuo pipefail
+
+trap 'error_handler $LINENO' ERR
+
+error_handler() {
+    echo -e "\033[0;31m[✘] Error on line $1 — script aborted!\033[0m"
+    echo "retry again if this happends again report in https://github.com/aserdevyt/aserdev-os/issues"
+    exit 1
+}
+
+
 # Colors 🎨
 RED="\e[31m"
 GREEN="\e[32m"
