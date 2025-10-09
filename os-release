@@ -7,5 +7,5 @@ HOME_URL="https://github.com/aserdevyt/aserdev-os"
 DOCUMENTATION_URL="https://github.com/aserdevyt/aserdev-os/blob/main/README.md"
 SUPPORT_URL="https://github.com/aserdevyt/aserdev-os/issues"
 BUG_REPORT_URL="https://github.com/aserdevyt/aserdev-os/issues"
-PRIVACY_POLICY_URL=https://github.com/aserdevyt/aserdev-os/blob/main/LICENSE"
+PRIVACY_POLICY_URL="https://github.com/aserdevyt/aserdev-os/blob/main/LICENSE"
 LOGO=archlinux-logo
