@@ -1,7 +1,12 @@
 # aserdev-os
 ## ⚠️work on progress don't use if you are not sure⚠️
 
-this script will reaname your os and install [chaotic aur](https://aur.chaotic.cx/) and will install 
+this ```os``` is inspired by [omarchy](https://omarchy.org/) but it isn't dev focused, it is focused for people who just want to have a cool hyprland setup that isn't fancy or complicated aka:[me](https://github.com/aserdevyy)
+
+## images
+
+
+
 ## installation
 
 make a fresh install of [archlinux](https://archlinux.org/) 
@@ -15,6 +20,7 @@ sudo pacman -Sy curl
 
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/aserdevyt/aserdev-os/main/install.sh)"
 ```
+
 
 ## issues
 
