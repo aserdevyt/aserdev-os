@@ -5,6 +5,11 @@ this ```os``` is inspired by [omarchy](https://omarchy.org/) but it isn't dev fo
 
 ## images
 
+<img width="1920" height="1080" alt="20251011_013024" src="https://github.com/user-attachments/assets/75d6eb1c-9b6a-475c-a7f3-988ffd361aad" />
+<img width="1921" height="1081" alt="20251011_012610" src="https://github.com/user-attachments/assets/5f7c56c7-3163-4284-af01-91b893bba6dd" />
+<img width="1921" height="1081" alt="20251011_012603" src="https://github.com/user-attachments/assets/2281e827-9dbf-4e2e-a790-855b3cf7eadd" />
+<img width="1921" height="1081" alt="20251011_012553" src="https://github.com/user-attachments/assets/2708d385-3a4e-4572-b40a-dcfe2ac98080" />
+<img width="1920" height="1080" alt="20251011_012537" src="https://github.com/user-attachments/assets/8bb79fec-d2ee-4f17-a605-4504d245bb74" />
 
 
 ## installation
