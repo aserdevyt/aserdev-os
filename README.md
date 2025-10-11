@@ -14,6 +14,8 @@ this ```os``` is inspired by [omarchy](https://omarchy.org/) but it isn't dev fo
 
 ## installation
 
+### script(recommended)
+
 make a fresh install of [archlinux](https://archlinux.org/) 
 and make a minimal install with multilib and testing enabled and make a normal user account with sudo enabled
 also install pipewire
@@ -25,9 +27,22 @@ sudo pacman -Sy curl
 
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/aserdevyt/aserdev-os/main/install.sh)"
 ```
+### ~ISO~ (coming soon)
 
+i need someone that can make an installer for this os that i can put in an iso
 
 ## issues
 
 if something happends report it [here](https://github.com/aserdevyt/aserdev-os/issues)
 
+## features
+
+- rofi menu
+- waybar
+- microsoft-edge-stable
+- comes with [aserdev-repo](https://github.com/aserdevyt/aserdev-repo)
+- thunar
+- kitty
+- wlogout
+- swaync
+- more
