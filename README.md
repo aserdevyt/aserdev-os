@@ -46,3 +46,11 @@ if something happends report it [here](https://github.com/aserdevyt/aserdev-os/i
 - wlogout
 - swaync
 - more
+- waypaper
+- pluma
+- discord
+- rofi-emoji
+- grimblast
+- btop
+- fastfetch
+- [brokefetch](https://github.com/Szerwigi1410/brokefetch)
