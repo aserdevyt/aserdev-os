@@ -1,101 +1,200 @@
 #!/usr/bin/env bash
+# aserdev-OS safer installer — remade
+# Keepin' the vibes but not nuking people's installs 💀
 set -euo pipefail
 
-# install deps
-sudo pacman -Syu --noconfirm --needed base-devel git base figlet curl wget
+# ---------- appearance ----------
+RED="\033[1;31m"
+GREEN="\033[1;32m"
+YELLOW="\033[1;33m"
+BLUE="\033[1;34m"
+MAGENTA="\033[1;35m"
+CYAN="\033[1;36m"
+WHITE="\033[1;37m"
+RESET="\033[0m"
 
+figlet_exists() { command -v figlet &>/dev/null; }
+
+# If figlet missing, fallback to plain echo banner
+banner() {
+  if figlet_exists; then
+    figlet -f slant "$1"
+  else
+    echo -e "${MAGENTA}===== $1 =====${RESET}"
+  fi
+}
+
+# ---------- env helpers ----------
+# Determine whether to prefix commands with sudo
+if [[ $EUID -eq 0 ]]; then
+  SUDO=""
+else
+  SUDO="sudo"
+fi
+
+# Detect original user/home when run with sudo
+if [[ -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]]; then
+  INVOKER="${SUDO_USER}"
+  INVOKER_HOME="$(getent passwd "$INVOKER" | cut -d: -f6)"
+else
+  INVOKER="$(id -un)"
+  INVOKER_HOME="${HOME}"
+fi
+
+# Tmp paths
+TMP="/tmp/aserdev-installer.$$"
+mkdir -p "$TMP"
+
+# ---------- confirmation ----------
 clear
-figlet "CONFIRMATION"
+banner "CONFIRM"
 
-# colors
-red="\e[31m"
-green="\e[32m"
-yellow="\e[33m"
-blue="\e[34m"
-magenta="\e[35m"
-cyan="\e[36m"
-white="\e[37m"
-reset="\e[0m"
-
-echo -e "${red}wsp${reset} this ${green}script${reset} will install ${blue}aserdev-os${reset}."
-echo -e "It ${yellow}overrides${reset} your install of ${cyan}Arch Linux${reset} with ${magenta}aserdev-os${reset}."
+echo -e "${RED}wsp${RESET} this ${GREEN}script${RESET} will install ${BLUE}aserdev-os${RESET}."
+echo -e "It ${YELLOW}overrides${RESET} some parts of your Arch install (os-release, grub, dotfiles, theme)."
 echo -e "Do you want to continue? (y/N)"
 read -r answer
-
-# make N default
 answer=${answer:-n}
 
 if [[ "$answer" != "y" && "$answer" != "Y" ]]; then
-    echo -e "${red}Exiting...${reset}"
-    exit 1
+  echo -e "${RED}Exiting...${RESET}"
+  rm -rf "$TMP"
+  exit 1
 fi
 
-echo -e "${green}Continuing...${reset}"
-sleep 1
-clear
-figlet "INSTALLATION"
-
-# run  main install script
-bash <(curl -fsSL https://raw.githubusercontent.com/aserdevyt/aserdev-repo/refs/heads/main/install.sh)
-# grub
-bash <(curl -fsSL https://raw.githubusercontent.com/aserdevyt/aserdev-os/refs/heads/main/grub.sh)
-clear
-figlet "OS SETUP"
-
-# Replace /etc/os-release
-REMOTE_URL="https://raw.githubusercontent.com/aserdevyt/aserdev-os/refs/heads/main/os-release"
-TARGET="/etc/os-release"
-BACKUP="/etc/os-release.bak.$(date +%s)"
-
-echo -e "${yellow}Backing up current os-release...${reset}"
-if [[ -f "$TARGET" ]]; then
-    sudo cp "$TARGET" "$BACKUP"
-    echo -e "${cyan}Backup created at${reset} ${white}$BACKUP${reset}"
-fi
-
-echo -e "${yellow}Downloading new os-release...${reset}"
-if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$REMOTE_URL" -o /tmp/os-release.new
-elif command -v wget >/dev/null 2>&1; then
-    wget -qO /tmp/os-release.new "$REMOTE_URL"
-else
-    echo -e "${red}curl/wget not found, can't download file.${reset}"
-    exit 1
-fi
-
-if [[ ! -s /tmp/os-release.new ]]; then
-    echo -e "${red}Download failed or empty file.${reset}"
-    exit 1
-fi
-
-sudo cp /tmp/os-release.new "$TARGET"
-sudo chmod 644 "$TARGET"
-sudo chown root:root "$TARGET"
-
-echo -e "${green}Successfully replaced /etc/os-release with aserdev-os info.${reset}"
+echo -e "${GREEN}Continuing...${RESET}"
 sleep 1
 
-clear
-figlet "DOTFILES"
+# ---------- install dependencies (after confirmation) ----------
+banner "INSTALL"
 
-# clone and install dotfiles
-if [[ -d "$HOME/aserdev-dotfiles" ]]; then
-    echo -e "${yellow}Existing aserdev-dotfiles found, removing...${reset}"
-    rm -rf "$HOME/aserdev-dotfiles"
-fi
+echo -e "${CYAN}Checking for package manager & installing deps...${RESET}"
 
-echo -e "${cyan}Cloning aserdev-dotfiles...${reset}"
-git clone --depth=1 https://github.com/aserdevyt/aserdev-dotfiles.git "$HOME/aserdev-dotfiles"
+install_packages() {
+  # params: package names...
+  if command -v pacman &>/dev/null; then
+    $SUDO pacman -Syu --noconfirm --needed "$@"
+  elif command -v apt &>/dev/null; then
+    $SUDO apt update
+    $SUDO apt install -y "$@"
+  else
+    echo -e "${YELLOW}No supported package manager detected (pacman/apt). Please install git/figlet/curl/wget manually.${RESET}"
+  fi
+}
 
-cd "$HOME/aserdev-dotfiles"
+# Only install what we actually need
+install_packages git figlet curl wget
 
-if [[ -x "./install" ]]; then
-    echo -e "${green}Running dotfiles installer (silent)...${reset}"
-    ./install --silent || echo -e "${red}Dotfiles install failed 💀${reset}"
+# ---------- run main install script (download-first) ----------
+MAIN_INSTALL_URL="https://raw.githubusercontent.com/aserdevyt/aserdev-repo/main/install.sh"
+MAIN_INSTALL_LOCAL="$TMP/install.sh"
+
+echo -e "${CYAN}Downloading main install script...${RESET}"
+curl -fsSL "$MAIN_INSTALL_URL" -o "$MAIN_INSTALL_LOCAL"
+if [[ ! -s "$MAIN_INSTALL_LOCAL" ]]; then
+  echo -e "${RED}Failed to download main installer.${RESET}"
 else
-    echo -e "${red}No install script found in dotfiles repo 💀${reset}"
+  echo -e "${CYAN}Running main installer...${RESET}"
+  # Run as root to allow privileged operations inside the installer
+  $SUDO bash "$MAIN_INSTALL_LOCAL" || echo -e "${YELLOW}Main installer failed (continuing with the rest).${RESET}"
 fi
 
-clear
-figlet "DONE"
-echo -e "${blue}Installation complete!${reset} ${magenta}Welcome to aserdev-os 🚀${reset}"
+# ---------- grub script (download-first, run as root) ----------
+GRUB_URL="https://raw.githubusercontent.com/aserdevyt/aserdev-os/main/grub.sh"
+GRUB_LOCAL="$TMP/grub.sh"
+
+echo -e "${CYAN}Downloading grub script...${RESET}"
+curl -fsSL "$GRUB_URL" -o "$GRUB_LOCAL"
+if [[ -s "$GRUB_LOCAL" ]]; then
+  echo -e "${CYAN}Executing grub script as root...${RESET}"
+  $SUDO bash "$GRUB_LOCAL" || echo -e "${RED}grub script failed — check /tmp for logs${RESET}"
+else
+  echo -e "${YELLOW}Could not download grub script, skipping grub changes.${RESET}"
+fi
+
+# ---------- replace /etc/os-release (with backup) ----------
+OS_RELEASE_URL="https://raw.githubusercontent.com/aserdevyt/aserdev-os/main/os-release"
+OS_RELEASE_TMP="$TMP/os-release.new"
+OS_RELEASE_TARGET="/etc/os-release"
+OS_RELEASE_BACKUP="/etc/os-release.bak.$(date +%s)"
+
+echo -e "${CYAN}Backing up current /etc/os-release (if exists)...${RESET}"
+if [[ -f "$OS_RELEASE_TARGET" ]]; then
+  $SUDO cp "$OS_RELEASE_TARGET" "$OS_RELEASE_BACKUP"
+  echo -e "${WHITE}Backup created at${RESET} ${OS_RELEASE_BACKUP}"
+fi
+
+echo -e "${CYAN}Downloading new os-release...${RESET}"
+curl -fsSL "$OS_RELEASE_URL" -o "$OS_RELEASE_TMP"
+
+if [[ -s "$OS_RELEASE_TMP" ]]; then
+  $SUDO cp "$OS_RELEASE_TMP" "$OS_RELEASE_TARGET"
+  $SUDO chmod 644 "$OS_RELEASE_TARGET"
+  $SUDO chown root:root "$OS_RELEASE_TARGET"
+  echo -e "${GREEN}Replaced /etc/os-release${RESET}"
+else
+  echo -e "${YELLOW}Failed to fetch new os-release; skipping.${RESET}"
+fi
+
+# ---------- dotfiles (clone into invoker's home & run installer as invoker) ----------
+DOTFILES_GIT="https://github.com/aserdevyt/aserdev-dotfiles.git"
+DOTFILES_DIR="$INVOKER_HOME/aserdev-dotfiles"
+
+echo -e "${CYAN}Setting up dotfiles for user ${INVOKER}...${RESET}"
+if [[ -d "$DOTFILES_DIR" ]]; then
+  echo -e "${YELLOW}Existing dotfiles found, removing...${RESET}"
+  rm -rf "$DOTFILES_DIR"
+fi
+
+# clone as the invoking user (so file ownership is right)
+if [[ "$INVOKER" != "$(id -un)" ]]; then
+  # we have a different invoker (script run under sudo)
+  $SUDO -u "$INVOKER" git clone --depth=1 "$DOTFILES_GIT" "$DOTFILES_DIR" || echo -e "${YELLOW}Dotfiles clone failed.${RESET}"
+else
+  git clone --depth=1 "$DOTFILES_GIT" "$DOTFILES_DIR" || echo -e "${YELLOW}Dotfiles clone failed.${RESET}"
+fi
+
+# Run dotfiles install if present and executable
+if [[ -f "$DOTFILES_DIR/install" && -x "$DOTFILES_DIR/install" ]]; then
+  echo -e "${CYAN}Running dotfiles installer (silent)...${RESET}"
+  if [[ "$INVOKER" != "$(id -un)" ]]; then
+    # run as invoker
+    $SUDO -u "$INVOKER" bash -c "cd '$DOTFILES_DIR' && ./install --silent" || echo -e "${RED}Dotfiles install failed.${RESET}"
+  else
+    (cd "$DOTFILES_DIR" && ./install --silent) || echo -e "${RED}Dotfiles install failed.${RESET}"
+  fi
+else
+  echo -e "${YELLOW}No install script in dotfiles repo — manual setup may be required.${RESET}"
+fi
+
+# ---------- SDDM + Catppuccin Mocha theme ----------
+banner "THEME"
+echo -e "${BLUE}Preparing Catppuccin Mocha (Mauve) SDDM theme install...${RESET}"
+
+# Ensure sddm exists (install if missing)
+if ! command -v sddm &>/dev/null; then
+  echo -e "${YELLOW}SDDM not detected. Installing sddm...${RESET}"
+  install_packages sddm
+else
+  echo -e "${GREEN}SDDM detected.${RESET}"
+fi
+
+# Download and run the Catppuccin mocha installer from your repo (safer: download first)
+CATP_URL="https://raw.githubusercontent.com/aserdevyt/aserdev-os/main/install_catppuccin_mocha.sh"
+CATP_LOCAL="$TMP/install_catppuccin_mocha.sh"
+
+echo -e "${CYAN}Downloading Catppuccin Mocha installer...${RESET}"
+curl -fsSL "$CATP_URL" -o "$CATP_LOCAL"
+
+if [[ -s "$CATP_LOCAL" ]]; then
+  echo -e "${CYAN}Running Catppuccin installer as root...${RESET}"
+  $SUDO bash "$CATP_LOCAL" || echo -e "${RED}Catppuccin installer failed.${RESET}"
+else
+  echo -e "${YELLOW}Failed to download Catppuccin installer; skipping theme setup.${RESET}"
+fi
+
+# ---------- final cleanup & done ----------
+rm -rf "$TMP"
+
+banner "DONE"
+echo -e "${BLUE}Installation complete!${RESET} ${MAGENTA}Welcome to aserdev-os 🚀${RESET}"
+echo -e "${YELLOW}Tip: Reboot to apply GRUB/SDDM changes.${RESET}"
