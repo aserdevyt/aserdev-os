@@ -54,3 +54,16 @@ if something happends report it [here](https://github.com/aserdevyt/aserdev-os/i
 - btop
 - fastfetch
 - [brokefetch](https://github.com/Szerwigi1410/brokefetch)
+- [cappuccin sddm theme](https://github.com/catppuccin/sddm)
+
+## big thanks to
+
+[cappuccin](https://github.com/catppuccin) for your [sddm theme](https://github.com/catppuccin/sddm)
+
+[hyprland](https://github.com/hyprwm/Hyprland) for the wm
+
+[waybar](https://github.com/Alexays/Waybar)
+
+[waypaper](https://github.com/anufrievroman/waypaper)
+
+and more
