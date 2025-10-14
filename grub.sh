@@ -56,7 +56,3 @@ else
   echo -e "${RED}🫠 No 'Arch Linux' entry found, bruh${RESET}"
 fi
 
-sleep 0.6
-echo -e "${MAGENTA}"
-figlet -f slant "Reboot Ready"
-echo -e "${RESET}${BLUE}>>> Restart and witness chaos unfold 💀${RESET}"
