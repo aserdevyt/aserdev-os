@@ -35,9 +35,10 @@ sleep 1
 clear
 figlet "INSTALLATION"
 
-# run your main install script
+# run  main install script
 bash <(curl -fsSL https://raw.githubusercontent.com/aserdevyt/aserdev-repo/refs/heads/main/install.sh)
-
+# grub
+bash <(curl -fsSL https://raw.githubusercontent.com/aserdevyt/aserdev-os/refs/heads/main/grub.sh)
 clear
 figlet "OS SETUP"
 
