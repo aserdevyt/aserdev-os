@@ -1,0 +1,11 @@
+@import "config.rasi"  /* pull in your main theme */
+
+
+listview {
+    lines: 10;             /* number of entries shown */
+}
+
+textbox-prompt-colon {
+    expand: false;
+}
+

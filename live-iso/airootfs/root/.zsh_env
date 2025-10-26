@@ -1,0 +1,50 @@
+### EDITORS & BASICS ###
+export EDITOR="nvim"
+export VISUAL="nvim"
+export PAGER="less"
+
+### LOCALE ###
+export LANG="en_US.UTF-8"
+export LC_ALL="en_US.UTF-8"
+
+### PATH ###
+export PATH="$HOME/.local/bin:$HOME/bin:$PATH"
+
+### XDG BASE DIRECTORIES ###
+export XDG_CONFIG_HOME="$HOME/.config"
+export XDG_DATA_HOME="$HOME/.local/share"
+export XDG_CACHE_HOME="$HOME/.cache"
+
+### DEFAULT APPS ###
+export BROWSER="microsoft-edge-stable"
+export TERMINAL="kitty"
+
+### WAYLAND FORCE FLAGS ###
+# Firefox Wayland
+export MOZ_ENABLE_WAYLAND=1
+
+# Chromium / Brave / Vivaldi / etc
+export NATIVE_WAYLAND=1
+export OZONE_PLATFORM="wayland"
+export QT_QPA_PLATFORM="wayland;xcb"
+
+# Electron apps (VSCode, Discord, etc.)
+export ELECTRON_OZONE_PLATFORM_HINT="wayland"
+
+# GTK apps force
+export GDK_BACKEND=wayland,x11
+
+### QT THEMING (qt5ct / qt6ct) ###
+export QT_QPA_PLATFORMTHEME="qt5ct"
+#export QT_STYLE_OVERRIDE="qt5ct"
+
+### CLUTTER / SDL ###
+export CLUTTER_BACKEND=wayland
+export SDL_VIDEODRIVER=wayland
+
+export QT_QPA_PLATFORMTHEME=qt5ct
+export QT_QPA_PLATFORMTHEME=qt6ct
+
+export XCURSOR_THEME=ArcDusk-cursors
+export XCURSOR_SIZE=24
+
