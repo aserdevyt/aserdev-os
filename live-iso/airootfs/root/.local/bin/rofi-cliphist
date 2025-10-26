@@ -1,9 +1,0 @@
-#!/bin/bash
-
-selected=$(cliphist list | rofi -dmenu -p "📋 Clipboard" -theme ~/.config/rofi/clipboard.rasi)
-
-if [ -n "$selected" ]; then
-    cliphist decode <<< "$selected" | wl-copy
-    notify-send "✅ Copied to clipboard"
-fi
-
