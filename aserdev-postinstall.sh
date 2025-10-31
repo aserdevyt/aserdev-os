@@ -27,4 +27,18 @@ echo "🧾 Replacing os-release..."
 curl -fsSL https://raw.githubusercontent.com/aserdevyt/aserdev-os/refs/heads/main/os-release -o /etc/os-release
 echo "✅ os-release replaced"
 
+# Copy /etc/skel to all users
+echo "📂 Copying /etc/skel to all user home directories..."
+for userhome in /home/*; do
+    if [ -d "$userhome" ]; then
+        cp -rT /etc/skel "$userhome"
+        chown -R "$(basename "$userhome")":"$(basename "$userhome")" "$userhome"
+        echo "✅ Updated: $userhome"
+    fi
+done
+
+# Also update /root
+cp -rT /etc/skel /root
+echo "✅ /root updated from /etc/skel"
+
 echo "🎉 All done! System ready to boot into chaos mode. 🚀"
