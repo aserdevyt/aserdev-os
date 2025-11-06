@@ -77,12 +77,12 @@ install_packages() {
     $SUDO apt update
     $SUDO apt install -y "$@"
   else
-    echo -e "${YELLOW}No supported package manager detected (pacman/apt). Please install git/figlet/curl/wget manually.${RESET}"
+    echo -e "${YELLOW}No supported package manager detected (pacman/apt). Please install git/figlet/curl/wget/zsh manually.${RESET}"
   fi
 }
 
-# Only install what we actually need
-install_packages git figlet curl wget
+# Install core tools plus zsh, which is needed for shell setup
+install_packages git figlet curl wget zsh
 
 # ---------- run main install script (download-first) ----------
 MAIN_INSTALL_URL="https://raw.githubusercontent.com/aserdevyt/aserdev-repo/main/install.sh"
@@ -135,66 +135,59 @@ else
   echo -e "${YELLOW}Failed to fetch new os-release; skipping.${RESET}"
 fi
 
-# ---------- dotfiles (clone into invoker's home & run installer as invoker) ----------
-DOTFILES_GIT="https://github.com/aserdevyt/aserdev-dotfiles.git"
-DOTFILES_DIR="$INVOKER_HOME/aserdev-dotfiles"
+# ---------- Package-based Skeleton and Shell Setup (Replaces Dotfiles) ----------
+banner "SETUP"
 
-echo -e "${CYAN}Setting up dotfiles for user ${INVOKER}...${RESET}"
-if [[ -d "$DOTFILES_DIR" ]]; then
-  echo -e "${YELLOW}Existing dotfiles found, removing...${RESET}"
-  rm -rf "$DOTFILES_DIR"
-fi
+# 1. Install skeleton and all-in-one packages
+echo -e "${CYAN}Installing aserdev-os-skel and aserdev-os-all packages...${RESET}"
+install_packages aserdev-os-skel aserdev-os-all
 
-# clone as the invoking user (so file ownership is right)
-if [[ "$INVOKER" != "$(id -un)" ]]; then
-  # we have a different invoker (script run under sudo)
-  $SUDO -u "$INVOKER" git clone --depth=1 "$DOTFILES_GIT" "$DOTFILES_DIR" || echo -e "${YELLOW}Dotfiles clone failed.${RESET}"
+# 2. Copy skeleton files to the current user's home
+echo -e "${CYAN}Copying skeleton files from /etc/skel to ${INVOKER_HOME} for user ${INVOKER}...${RESET}"
+if [[ -d "/etc/skel" ]]; then
+    # Copy contents, including hidden files, and preserve ownership (which is currently root/root)
+    $SUDO cp -R /etc/skel/. "$INVOKER_HOME" || echo -e "${YELLOW}Warning: Failed to copy /etc/skel contents.${RESET}"
+    # Ensure all copied files are owned by the invoking user
+    $SUDO chown -R "$INVOKER":"$(id -g -n "$INVOKER")" "$INVOKER_HOME" || echo -e "${YELLOW}Warning: Failed to fix ownership in home directory.${RESET}"
+    echo -e "${GREEN}Skeleton files applied.${RESET}"
 else
-  git clone --depth=1 "$DOTFILES_GIT" "$DOTFILES_DIR" || echo -e "${YELLOW}Dotfiles clone failed.${RESET}"
+    echo -e "${RED}Error: /etc/skel directory not found after package install. Skipping skeleton copy.${RESET}"
 fi
 
-# Run dotfiles install if present and executable
-if [[ -f "$DOTFILES_DIR/install" && -x "$DOTFILES_DIR/install" ]]; then
-  echo -e "${CYAN}Running dotfiles installer (silent)...${RESET}"
-  if [[ "$INVOKER" != "$(id -un)" ]]; then
-    # run as invoker
-    $SUDO -u "$INVOKER" bash -c "cd '$DOTFILES_DIR' && ./install --silent" || echo -e "${RED}Dotfiles install failed.${RESET}"
-  else
-    (cd "$DOTFILES_DIR" && ./install --silent) || echo -e "${RED}Dotfiles install failed.${RESET}"
-  fi
+
+# 3. Change current user's shell to zsh
+echo -e "${CYAN}Setting current user (${INVOKER}) shell to /bin/zsh...${RESET}"
+if command -v chsh &>/dev/null; then
+    # chsh requires the full path to the shell
+    $SUDO chsh -s /bin/zsh "$INVOKER" || echo -e "${YELLOW}Warning: Failed to change ${INVOKER}'s shell using chsh. Check if /bin/zsh exists.${RESET}"
 else
-  echo -e "${YELLOW}No install script in dotfiles repo — manual setup may be required.${RESET}"
+    echo -e "${YELLOW}Warning: chsh command not found, cannot change current user shell.${RESET}"
 fi
 
-# ---------- SDDM + Catppuccin Mocha theme ----------
+# 4. Set default shell for new users
+DEFAULT_USERADD="/etc/default/useradd"
+echo -e "${CYAN}Setting default shell for new users to /bin/zsh...${RESET}"
+if [[ -f "$DEFAULT_USERADD" ]]; then
+    # Attempt to replace existing SHELL= line or add it if missing
+    if $SUDO grep -q '^SHELL=' "$DEFAULT_USERADD"; then
+        $SUDO sed -i 's/^SHELL=\/.*$/SHELL=\/bin\/zsh/' "$DEFAULT_USERADD"
+    else
+        # If SHELL setting doesn't exist, append it.
+        echo "SHELL=/bin/zsh" | $SUDO tee -a "$DEFAULT_USERADD" > /dev/null
+    fi
+    echo -e "${GREEN}Updated default user shell in $DEFAULT_USERADD.${RESET}"
+else
+    echo -e "${YELLOW}Could not find $DEFAULT_USERADD; new users may still default to bash.${RESET}"
+fi
+
+# ---------- SDDM Theme Setup ----------
 banner "THEME"
-echo -e "${BLUE}Preparing Catppuccin Mocha (Mauve) SDDM theme install...${RESET}"
-
-# Ensure sddm exists (install if missing)
-if ! command -v sddm &>/dev/null; then
-  echo -e "${YELLOW}SDDM not detected. Installing sddm...${RESET}"
-  install_packages sddm
-else
-  echo -e "${GREEN}SDDM detected.${RESET}"
-fi
-
-# Download and run the Catppuccin mocha installer from your repo (safer: download first)
-CATP_URL="https://raw.githubusercontent.com/aserdevyt/aserdev-os/main/install_catppuccin_mocha.sh"
-CATP_LOCAL="$TMP/install_catppuccin_mocha.sh"
-
-echo -e "${CYAN}Downloading Catppuccin Mocha installer...${RESET}"
-curl -fsSL "$CATP_URL" -o "$CATP_LOCAL"
-
-if [[ -s "$CATP_LOCAL" ]]; then
-  echo -e "${CYAN}Running Catppuccin installer as root...${RESET}"
-  $SUDO bash "$CATP_LOCAL" || echo -e "${RED}Catppuccin installer failed.${RESET}"
-else
-  echo -e "${YELLOW}Failed to download Catppuccin installer; skipping theme setup.${RESET}"
-fi
+echo -e "${CYAN}Skipping custom SDDM theme installation.${RESET}"
+echo -e "${BLUE}The system's default SDDM theme will be retained.${RESET}"
 
 # ---------- final cleanup & done ----------
 rm -rf "$TMP"
 
 banner "DONE"
 echo -e "${BLUE}Installation complete!${RESET} ${MAGENTA}Welcome to aserdev-os 🚀${RESET}"
-echo -e "${YELLOW}Tip: Reboot to apply GRUB/SDDM changes.${RESET}"
+echo -e "${YELLOW}Tip: Reboot to apply GRUB/SDDM and ZSH changes.${RESET}"
