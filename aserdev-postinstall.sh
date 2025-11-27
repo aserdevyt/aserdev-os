@@ -15,6 +15,24 @@ curl -fsSL https://raw.githubusercontent.com/aserdevyt/aserdev-os/refs/heads/mai
 mv -f /etc/pacman.conf.new /etc/pacman.conf
 echo "✅ pacman.conf updated"
 
+# Install full PipeWire + NetworkManager stack
+echo "📦 Installing PipeWire + NetworkManager..."
+pacman -Sy --noconfirm \
+    pipewire \
+    pipewire-pulse \
+    pipewire-alsa \
+    pipewire-jack \
+    wireplumber \
+    networkmanager \
+    network-manager-applet \
+    dialog \
+    wpa_supplicant || { echo "💀 Failed installing audio/network stuff"; exit 1; }
+
+# Enable + start systemd services
+echo "⚡ Enabling PipeWire and NetworkManager services..."
+systemctl enable --now pipewire pipewire-pulse pipewire-alsa wireplumber NetworkManager || { echo "💀 Failed to enable/start services"; exit 1; }
+echo "✅ Services enabled and running"
+
 # Fetch and execute GRUB setup
 echo "⚙️ Running GRUB setup..."
 curl -fsSL https://raw.githubusercontent.com/aserdevyt/aserdev-os/refs/heads/main/grub.sh -o /root/grub.sh
