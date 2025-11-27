@@ -26,6 +26,7 @@ pacman -Sy --noconfirm \
     networkmanager \
     network-manager-applet \
     dialog \
+    sddm \
     wpa_supplicant || { echo "💀 Failed installing audio/network stuff"; exit 1; }
 
 # Enable + start systemd services
@@ -60,3 +61,4 @@ cp -rT /etc/skel /root
 echo "✅ /root updated from /etc/skel"
 
 echo "🎉 All done! System ready to boot into chaos mode. 🚀"
+systemctl enable sddm
