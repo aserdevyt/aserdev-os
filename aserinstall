@@ -32,6 +32,9 @@ args = parser.parse_args()
 
 # Open Log File
 try:
+    if os.path.exists(LOG_FILE):
+        os.remove(LOG_FILE)
+
     log_handle = open(LOG_FILE, "w")
 except PermissionError:
     print(f"{Colors.RED}[!] Cannot write to {LOG_FILE}. Run as root.{Colors.RESET}")
