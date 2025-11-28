@@ -39,9 +39,9 @@ sudo pacman -Sy curl
 
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/aserdevyt/aserdev-os/main/install.sh)"
 ```
-### ~ISO~ (coming soon)
+### ISO (NEW🤩)
 
-i need someone that can make an installer for this os that i can put in an iso
+you can get it from:[releases](https://github.com/aserdevyt/aserdev-os/releases)
 
 ## issues
 
