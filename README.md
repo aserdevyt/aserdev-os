@@ -3,6 +3,17 @@
 
 this ```os``` is inspired by [omarchy](https://omarchy.org/) but it isn't dev focused, it is focused for people who just want to have a cool hyprland setup that isn't fancy or complicated aka:[me](https://github.com/aserdevyy)
 
+
+## features
+- hyprland: the best wm no cap
+- waybar: kinda weak but cool
+- pkexec: i fixed it
+- [waypaper](https://github.com/anufrievroman/waypaper): hella usefull
+- [aser-settings](https://github.com/aserdevyt/aserdev-settings): hella fast settings app
+- [aserdev-repo](https://github.com/aserdevyt/aserdev-repo):some apps for this os
+- [aserdev-os-utils](https://github.com/aserdevyt/aserdev-os-utils):very usefull scripts
+
+
 ## images
 
 <img width="1920" height="1080" alt="20251011_013024" src="https://github.com/user-attachments/assets/75d6eb1c-9b6a-475c-a7f3-988ffd361aad" />
@@ -35,35 +46,4 @@ i need someone that can make an installer for this os that i can put in an iso
 
 if something happends report it [here](https://github.com/aserdevyt/aserdev-os/issues)
 
-## features
 
-- rofi menu
-- waybar
-- microsoft-edge-stable
-- comes with [aserdev-repo](https://github.com/aserdevyt/aserdev-repo)
-- thunar
-- kitty
-- wlogout
-- swaync
-- more
-- waypaper
-- pluma
-- discord
-- rofi-emoji
-- grimblast
-- btop
-- fastfetch
-- [brokefetch](https://github.com/Szerwigi1410/brokefetch)
-
-
-## big thanks to
-
-
-
-[hyprland](https://github.com/hyprwm/Hyprland) for the wm
-
-[waybar](https://github.com/Alexays/Waybar)
-
-[waypaper](https://github.com/anufrievroman/waypaper)
-
-and more
