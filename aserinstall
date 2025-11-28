@@ -79,6 +79,10 @@ def run_command(command, shell=False, check=True):
     cmd_str = command if isinstance(command, str) else " ".join(command)
     log(f"Executing: {cmd_str}", "CMD")
 
+    # FIX: Automatically enable shell=True if command is a string to prevent [Errno 2]
+    if isinstance(command, str):
+        shell = True
+
     try:
         # Popen allows us to stream output
         process = subprocess.Popen(
@@ -331,8 +335,8 @@ def main():
     try:
         # 1. Cleanup
         log("Cleaning up previous mounts...", "INFO")
-        run_command("umount -R /mnt", shell=True, check=False)
-        run_command("swapoff -a", shell=True, check=False)
+        run_command("umount -R /mnt", check=False)
+        run_command("swapoff -a", check=False)
 
         # 2. Partitioning (If Full)
         if part_method == "Full":
@@ -399,16 +403,16 @@ def main():
 
         # 6. Configuration
         log("Configuring System...", "INFO")
-        run_command("genfstab -U /mnt >> /mnt/etc/fstab", shell=True)
+        run_command("genfstab -U /mnt >> /mnt/etc/fstab")
         run_command(f"arch-chroot /mnt ln -sf /usr/share/zoneinfo/{selected_zone} /etc/localtime")
         run_command("arch-chroot /mnt hwclock --systohc")
-        run_command(f"echo {hostname} > /mnt/etc/hostname", shell=True)
+        run_command(f"echo {hostname} > /mnt/etc/hostname")
         
         log(f"Generating Locale: {selected_locale}...", "INFO")
-        run_command(f"echo '{selected_locale} UTF-8' > /mnt/etc/locale.gen", shell=True)
+        run_command(f"echo '{selected_locale} UTF-8' > /mnt/etc/locale.gen")
         run_command("arch-chroot /mnt locale-gen")
-        run_command(f"echo 'LANG={selected_locale}' > /mnt/etc/locale.conf", shell=True)
-        run_command("echo 'KEYMAP=us' > /mnt/etc/vconsole.conf", shell=True)
+        run_command(f"echo 'LANG={selected_locale}' > /mnt/etc/locale.conf")
+        run_command("echo 'KEYMAP=us' > /mnt/etc/vconsole.conf")
 
         # 7. Users
         log("Setting Users...", "INFO")
@@ -420,7 +424,7 @@ def main():
         subprocess.run(["arch-chroot", "/mnt", "chpasswd"], stdin=p2.stdout)
 
         if grant_sudo:
-            run_command("sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /mnt/etc/sudoers", shell=True)
+            run_command("sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /mnt/etc/sudoers")
 
         # 8. Bootloader
         log("Installing Bootloader...", "INFO", Colors.YELLOW)
@@ -444,7 +448,7 @@ def main():
         run_command(f"arch-chroot /mnt /root/aserdev-postinstall.sh")
 
         log("Syncing disks (Unmounting)...", "INFO")
-        run_command("umount -R /mnt", shell=True, check=False)
+        run_command("umount -R /mnt", check=False)
 
         log("Installation Complete!", "INFO", Colors.GREEN)
         print(f"\n{Colors.GREEN}{Colors.BOLD}Success! You may now reboot.{Colors.RESET}")
