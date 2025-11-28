@@ -31,7 +31,7 @@ pacman -Sy --noconfirm \
 
 # Enable + start systemd services
 echo "⚡ Enabling PipeWire and NetworkManager services..."
-systemctl enable --now pipewire pipewire-pulse pipewire-alsa wireplumber NetworkManager || { echo "💀 Failed to enable/start services"; exit 1; }
+systemctl enable --now NetworkManager || { echo "💀 Failed to enable/start services"; exit 1; }
 echo "✅ Services enabled and running"
 
 # Fetch and execute GRUB setup
