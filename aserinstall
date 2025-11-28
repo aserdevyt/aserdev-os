@@ -1,0 +1,458 @@
+#!/usr/bin/env python3
+import os
+import subprocess
+import sys
+import shutil
+import argparse
+import time
+import signal
+
+# ==============================================================================
+# CONFIGURATION & CONSTANTS
+# ==============================================================================
+
+LOG_FILE = "/tmp/aserinstall.log"
+GITHUB_ISSUES = "https://github.com/aserdevyt/aserdev-os/issues"
+
+class Colors:
+    HEADER = '\033[95m'
+    BLUE = '\033[94m'
+    CYAN = '\033[96m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    RED = '\033[91m'
+    RESET = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+# Parse Arguments
+parser = argparse.ArgumentParser(description="AserDev OS Installer")
+parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output to terminal")
+args = parser.parse_args()
+
+# Open Log File
+try:
+    log_handle = open(LOG_FILE, "w")
+except PermissionError:
+    print(f"{Colors.RED}[!] Cannot write to {LOG_FILE}. Run as root.{Colors.RESET}")
+    sys.exit(1)
+
+# ==============================================================================
+# LOGGING & UTILS
+# ==============================================================================
+
+def log(message, level="INFO", color=Colors.RESET, to_screen=True):
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    clean_message = str(message)
+    
+    # Write to file (strip colors)
+    log_handle.write(f"[{timestamp}] [{level}] {clean_message}\n")
+    log_handle.flush()
+
+    # Write to screen
+    if to_screen:
+        prefix = ""
+        if level == "INFO": prefix = f"{Colors.GREEN}[+]{Colors.RESET} "
+        elif level == "WARN": prefix = f"{Colors.YELLOW}[*]{Colors.RESET} "
+        elif level == "ERROR": prefix = f"{Colors.RED}[!]{Colors.RESET} "
+        elif level == "CMD": prefix = f"{Colors.CYAN}[$]{Colors.RESET} "
+        
+        print(f"{prefix}{color}{clean_message}{Colors.RESET}")
+
+def error_handler(e):
+    log("\n" + "="*50, "ERROR")
+    log("CRITICAL FAILURE DETECTED", "ERROR", Colors.RED)
+    log(str(e), "ERROR", Colors.RED)
+    log("="*50, "ERROR")
+    
+    print(f"\n{Colors.RED}{Colors.BOLD}Installation Failed!{Colors.RESET}")
+    print(f"{Colors.YELLOW}Please check the log file for details:{Colors.RESET}")
+    print(f"  {Colors.BOLD}cat {LOG_FILE}{Colors.RESET}")
+    print(f"\nPlease report this issue at: {Colors.BLUE}{Colors.UNDERLINE}{GITHUB_ISSUES}{Colors.RESET}")
+    sys.exit(1)
+
+def run_command(command, shell=False, check=True):
+    """
+    Runs a command, logs it, and writes output to logfile.
+    If verbose, streams to stdout.
+    """
+    cmd_str = command if isinstance(command, str) else " ".join(command)
+    log(f"Executing: {cmd_str}", "CMD")
+
+    try:
+        # Popen allows us to stream output
+        process = subprocess.Popen(
+            command, 
+            shell=shell, 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.STDOUT, 
+            text=True
+        )
+
+        output_buffer = []
+        
+        # Real-time logging
+        for line in process.stdout:
+            line_clean = line.strip()
+            # Write raw to log file
+            log_handle.write(f"    | {line}")
+            output_buffer.append(line)
+            
+            # Print to screen if verbose
+            if args.verbose:
+                print(f"    | {line_clean}")
+
+        return_code = process.wait()
+
+        if check and return_code != 0:
+            raise subprocess.CalledProcessError(return_code, command, output="\n".join(output_buffer))
+        
+        return return_code == 0
+
+    except subprocess.CalledProcessError as e:
+        log(f"Command failed with exit code {e.returncode}", "ERROR")
+        raise e
+
+# ==============================================================================
+# UI CLASS
+# ==============================================================================
+
+class TUI:
+    def __init__(self):
+        if shutil.which("whiptail") is None:
+            # Fallback if dependency check failed logic somehow
+            print("Error: 'whiptail' is missing.")
+            sys.exit(1)
+
+    def msgbox(self, title, text):
+        subprocess.run(["whiptail", "--title", title, "--msgbox", text, "10", "60"])
+
+    def yesno(self, title, text):
+        result = subprocess.run(
+            ["whiptail", "--title", title, "--yesno", text, "10", "60"],
+            stderr=subprocess.DEVNULL
+        )
+        return result.returncode == 0
+
+    def inputbox(self, title, text, default=""):
+        result = subprocess.run(
+            ["whiptail", "--title", title, "--inputbox", text, "10", "60", default],
+            stderr=subprocess.PIPE
+        )
+        if result.returncode != 0:
+            return None
+        return result.stderr.decode('utf-8').strip()
+
+    def passwordbox(self, title, text):
+        result = subprocess.run(
+            ["whiptail", "--title", title, "--passwordbox", text, "10", "60"],
+            stderr=subprocess.PIPE
+        )
+        if result.returncode != 0:
+            return None
+        return result.stderr.decode('utf-8').strip()
+
+    def menu(self, title, text, items):
+        cmd = ["whiptail", "--title", title, "--menu", text, "20", "70", "10"]
+        for tag, desc in items:
+            cmd.extend([tag, desc])
+        
+        result = subprocess.run(cmd, stderr=subprocess.PIPE)
+        if result.returncode != 0:
+            return None
+        return result.stderr.decode('utf-8').strip()
+
+# ==============================================================================
+# DEPENDENCIES
+# ==============================================================================
+
+def install_dependencies():
+    required_packages = ["libnewt", "gptfdisk", "arch-install-scripts", "curl"]
+    log("Checking dependencies...", "INFO")
+    
+    # Check internet
+    try:
+        subprocess.check_call(["ping", "-c", "1", "8.8.8.8"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except subprocess.CalledProcessError:
+        log("No internet connection. Please run 'iwctl' to connect.", "ERROR", Colors.RED)
+        sys.exit(1)
+
+    # Init Keys
+    log("Initializing Pacman keyring...", "INFO")
+    try:
+        run_command("pacman-key --init", shell=True, check=False)
+        run_command("pacman-key --populate archlinux", shell=True, check=False)
+    except:
+        pass
+
+    # Install (-Sy only, as requested)
+    log("Installing tools (using -Sy)...", "INFO")
+    cmd = ["pacman", "-Sy", "--noconfirm", "--needed"] + required_packages
+    try:
+        run_command(cmd)
+        log("Dependencies installed.", "INFO", Colors.GREEN)
+    except Exception as e:
+        error_handler(e)
+
+# ==============================================================================
+# MAIN LOGIC
+# ==============================================================================
+
+def main():
+    if os.geteuid() != 0:
+        print(f"{Colors.RED}Must run as root.{Colors.RESET}")
+        sys.exit(1)
+
+    # 1. Install Dependencies immediately
+    install_dependencies()
+    
+    ui = TUI()
+
+    # --------------------------------------------------------------------------
+    # DATA COLLECTION PHASE (TUI)
+    # --------------------------------------------------------------------------
+    
+    ui.msgbox("AserDev OS Installer", "Welcome to the AserDev OS Installer.\n\nWe will collect all settings first, then execute the installation.")
+
+    # --- Disk Selection ---
+    try:
+        lsblk_out = subprocess.check_output("lsblk -d -n -o NAME,SIZE,MODEL", shell=True).decode('utf-8')
+        drives = []
+        for line in lsblk_out.strip().split('\n'):
+            parts = line.split(maxsplit=2)
+            if len(parts) >= 2:
+                name = parts[0]
+                size = parts[1]
+                model = parts[2] if len(parts) > 2 else "Unknown"
+                drives.append((f"/dev/{name}", f"{size} - {model}"))
+    except Exception as e:
+        error_handler(e)
+
+    selected_disk = ui.menu("Select Target Disk", "Choose the drive to install OS on:", drives)
+    if not selected_disk: sys.exit(0)
+
+    # --- Boot Mode ---
+    boot_mode = ui.menu("Boot Mode", "Select boot mode:", [
+        ("UEFI", "UEFI (Recommended)"),
+        ("BIOS", "Legacy BIOS")
+    ])
+    if not boot_mode: sys.exit(0)
+
+    # --- Partition Method ---
+    part_method = ui.menu("Partitioning Method", "How to partition?", [
+        ("Full", "WIPE & AUTOMATIC (Destructive)"),
+        ("Manual", "Manual (cfdisk)")
+    ])
+    if not part_method: sys.exit(0)
+
+    # Configuration Placeholders
+    partitions = {
+        "boot": None,
+        "swap": None,
+        "root": None,
+        "format_needed": False
+    }
+
+    if part_method == "Full":
+        if not ui.yesno("CONFIRM WIPE", f"WARNING: ALL DATA ON {selected_disk} WILL BE LOST.\nProceed?"):
+            sys.exit(0)
+        partitions["format_needed"] = True # We always format on full wipe
+        # We calculate names later based on the disk
+        
+    else:
+        # Manual Mode - We must run cfdisk NOW to allow user to pick partitions next
+        ui.msgbox("Manual Partitioning", f"Opening cfdisk for {selected_disk}.\nCreate your partitions, Write, then Quit.")
+        try:
+            subprocess.run(["cfdisk", selected_disk])
+        except:
+            ui.msgbox("Error", "cfdisk failed or was cancelled.")
+            
+        partitions["boot"] = ui.inputbox("Boot Partition", "Enter Boot/EFI partition (e.g. /dev/sda1):")
+        partitions["swap"] = ui.inputbox("Swap Partition", "Enter Swap partition (e.g. /dev/sda2):")
+        partitions["root"] = ui.inputbox("Root Partition", "Enter Root partition (e.g. /dev/sda3):")
+        
+        if not partitions["boot"] or not partitions["root"]:
+            ui.msgbox("Error", "Boot and Root partitions are required.")
+            sys.exit(1)
+            
+        if ui.yesno("Format", "Format these partitions during installation?"):
+            partitions["format_needed"] = True
+
+    # --- User Config ---
+    root_pass = ui.passwordbox("Root Password", "Enter Root password:")
+    if not root_pass: root_pass = "root"
+
+    new_user = ui.inputbox("User Account", "Enter new username:")
+    if not new_user: new_user = "aseruser"
+
+    user_pass = ui.passwordbox("User Password", f"Enter password for {new_user}:")
+    grant_sudo = ui.yesno("Sudo Access", "Enable sudo for user?")
+    
+    hostname = ui.inputbox("Hostname", "Enter hostname:", "aserdev-os")
+
+    # --- Localization ---
+    selected_zone = "UTC" # Default
+    # (Simplified timezone for brevity, or add menu back here if needed)
+    
+    default_locale = "en_US.UTF-8"
+    locale_choices = [
+        ("en_US.UTF-8", "English (US)"),
+        ("en_GB.UTF-8", "English (UK)"),
+        ("fr_FR.UTF-8", "French"),
+        ("de_DE.UTF-8", "German"),
+        ("es_ES.UTF-8", "Spanish"),
+        ("Other", "Custom")
+    ]
+    sel_loc = ui.menu("Locale", "Select System Locale:", locale_choices)
+    if sel_loc == "Other":
+        selected_locale = ui.inputbox("Custom Locale", "Enter locale (e.g. ja_JP.UTF-8):", default_locale)
+    else:
+        selected_locale = sel_loc if sel_loc else default_locale
+
+    # --- Final Confirmation ---
+    summary = f"""
+    Target Disk: {selected_disk}
+    Boot Mode:   {boot_mode}
+    Method:      {part_method}
+    User:        {new_user}
+    Hostname:    {hostname}
+    Locale:      {selected_locale}
+    
+    Ready to write changes to disk?
+    """
+    if not ui.yesno("Final Confirmation", summary):
+        sys.exit(0)
+
+    # --------------------------------------------------------------------------
+    # EXECUTION PHASE (LOGGED & VERBOSE)
+    # --------------------------------------------------------------------------
+    log("\n=== STARTING INSTALLATION ===", "INFO", Colors.HEADER)
+
+    try:
+        # 1. Cleanup
+        log("Cleaning up previous mounts...", "INFO")
+        run_command("umount -R /mnt", shell=True, check=False)
+        run_command("swapoff -a", shell=True, check=False)
+
+        # 2. Partitioning (If Full)
+        if part_method == "Full":
+            log(f"Wiping {selected_disk}...", "INFO", Colors.YELLOW)
+            run_command(f"sgdisk -Z {selected_disk}")
+            run_command(f"wipefs -a {selected_disk}")
+            
+            log(f"Creating {boot_mode} partition table...", "INFO")
+            if boot_mode == "UEFI":
+                run_command(f"sgdisk -n 1:0:+1G -t 1:ef00 {selected_disk}")
+                run_command(f"sgdisk -n 2:0:+2G -t 2:8200 {selected_disk}")
+                run_command(f"sgdisk -n 3:0:0 -t 3:8300 {selected_disk}")
+            else: # BIOS
+                run_command(f"sgdisk -n 1:0:+2M -t 1:ef02 {selected_disk}")
+                run_command(f"sgdisk -n 2:0:+2G -t 2:8200 {selected_disk}")
+                run_command(f"sgdisk -n 3:0:0 -t 3:8300 {selected_disk}")
+                
+            # Determine names
+            prefix = selected_disk + ("p" if "nvme" in selected_disk else "")
+            if boot_mode == "UEFI":
+                partitions["boot"] = f"{prefix}1"
+                partitions["swap"] = f"{prefix}2"
+                partitions["root"] = f"{prefix}3"
+            else:
+                # BIOS boot partition (p1) is unformatted/hidden
+                partitions["swap"] = f"{prefix}2"
+                partitions["root"] = f"{prefix}3"
+                partitions["boot"] = None # Boot is folder in Root
+
+        # 3. Formatting
+        if partitions["format_needed"]:
+            log("Formatting filesystems...", "INFO", Colors.YELLOW)
+            if partitions["swap"]:
+                run_command(f"mkswap {partitions['swap']}")
+            
+            log(f"Formatting Root {partitions['root']}...", "INFO")
+            run_command(f"mkfs.ext4 -F {partitions['root']}")
+            
+            if partitions["boot"] and boot_mode == "UEFI":
+                log(f"Formatting EFI {partitions['boot']}...", "INFO")
+                run_command(f"mkfs.fat -F32 {partitions['boot']}")
+
+        # 4. Mounting
+        log("Mounting filesystems...", "INFO")
+        run_command(f"mount {partitions['root']} /mnt")
+        
+        if partitions["swap"]:
+            run_command(f"swapon {partitions['swap']}")
+            
+        if boot_mode == "UEFI" and partitions["boot"]:
+            run_command("mkdir -p /mnt/boot")
+            run_command(f"mount {partitions['boot']} /mnt/boot")
+
+        # 5. Pacstrap
+        log("Installing Base System (This may take a while)...", "INFO", Colors.CYAN)
+        pkg_list = (
+            "base base-devel linux-zen dkms linux-zen-headers broadcom-wl-dkms "
+            "aserdev-os-all texinfo iptables-nft mkinitcpio pipewire-jack "
+            "noto-fonts grub efibootmgr"
+        ).split()
+        
+        # pacstrap -c for cache, /mnt is target
+        run_command(["pacstrap", "-c", "/mnt"] + pkg_list)
+
+        # 6. Configuration
+        log("Configuring System...", "INFO")
+        run_command("genfstab -U /mnt >> /mnt/etc/fstab", shell=True)
+        run_command(f"arch-chroot /mnt ln -sf /usr/share/zoneinfo/{selected_zone} /etc/localtime")
+        run_command("arch-chroot /mnt hwclock --systohc")
+        run_command(f"echo {hostname} > /mnt/etc/hostname", shell=True)
+        
+        log(f"Generating Locale: {selected_locale}...", "INFO")
+        run_command(f"echo '{selected_locale} UTF-8' > /mnt/etc/locale.gen", shell=True)
+        run_command("arch-chroot /mnt locale-gen")
+        run_command(f"echo 'LANG={selected_locale}' > /mnt/etc/locale.conf", shell=True)
+        run_command("echo 'KEYMAP=us' > /mnt/etc/vconsole.conf", shell=True)
+
+        # 7. Users
+        log("Setting Users...", "INFO")
+        p1 = subprocess.Popen(["echo", f"root:{root_pass}"], stdout=subprocess.PIPE)
+        subprocess.run(["arch-chroot", "/mnt", "chpasswd"], stdin=p1.stdout)
+        
+        run_command(f"arch-chroot /mnt useradd -m -G wheel -s /bin/bash {new_user}")
+        p2 = subprocess.Popen(["echo", f"{new_user}:{user_pass}"], stdout=subprocess.PIPE)
+        subprocess.run(["arch-chroot", "/mnt", "chpasswd"], stdin=p2.stdout)
+
+        if grant_sudo:
+            run_command("sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /mnt/etc/sudoers", shell=True)
+
+        # 8. Bootloader
+        log("Installing Bootloader...", "INFO", Colors.YELLOW)
+        if boot_mode == "UEFI":
+            run_command("arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=AserDevOS")
+        else:
+            run_command(f"arch-chroot /mnt grub-install --target=i386-pc {selected_disk}")
+            
+        run_command("arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg")
+
+        # 9. Post-Install
+        log("Running Post-Install Script...", "INFO", Colors.CYAN)
+        script_path = "/mnt/root/aserdev-postinstall.sh"
+        script_url = "https://raw.githubusercontent.com/aserdevyt/aserdev-os/refs/heads/main/aserdev-postinstall.sh"
+        
+        run_command(f"curl -L {script_url} -o {script_path}")
+        run_command(f"chmod +x {script_path}")
+        # Note: os.system used here to allow the post-install script to potentially take over TUI/Output if it has its own
+        # However, to keep logging we should use run_command, but the post-install might need interactivity?
+        # Assuming non-interactive based on previous context, using run_command to log output.
+        run_command(f"arch-chroot /mnt /root/aserdev-postinstall.sh")
+
+        log("Syncing disks (Unmounting)...", "INFO")
+        run_command("umount -R /mnt", shell=True, check=False)
+
+        log("Installation Complete!", "INFO", Colors.GREEN)
+        print(f"\n{Colors.GREEN}{Colors.BOLD}Success! You may now reboot.{Colors.RESET}")
+
+    except Exception as e:
+        error_handler(e)
+
+if __name__ == "__main__":
+    # Handle Ctrl+C gracefully
+    signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(0))
+    main()
