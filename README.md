@@ -12,6 +12,7 @@ this ```os``` is inspired by [omarchy](https://omarchy.org/) but it isn't dev fo
 - [aser-settings](https://github.com/aserdevyt/aserdev-settings): hella fast settings app
 - [aserdev-repo](https://github.com/aserdevyt/aserdev-repo):some apps for this os
 - [aserdev-os-utils](https://github.com/aserdevyt/aserdev-os-utils):very usefull scripts
+- [microsoft-edge](https://en.wikipedia.org/wiki/Microsoft_Edge): wait wait, i fixed it, it has wayland; and if you don't like it you can change it easly please.
 
 
 ## images
