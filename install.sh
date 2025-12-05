@@ -184,6 +184,7 @@ fi
 banner "THEME"
 echo -e "${CYAN}Skipping custom SDDM theme installation.${RESET}"
 echo -e "${BLUE}The system's default SDDM theme will be retained.${RESET}"
+sudo pacman -Syu --noconfirm --needed sddm
 sudo systemctl enable sddm
 # ---------- final cleanup & done ----------
 rm -rf "$TMP"
