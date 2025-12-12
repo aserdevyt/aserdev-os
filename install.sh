@@ -140,7 +140,7 @@ banner "SETUP"
 
 # 1. Install skeleton and all-in-one packages
 echo -e "${CYAN}Installing aserdev-os-skel and aserdev-os-all packages...${RESET}"
-install_packages aserdev-os-skel aserdev-os-all
+install_packages aserdev-os-hyprland 
 
 # 2. Copy skeleton files to the current user's home
 echo -e "${CYAN}Copying skeleton files from /etc/skel to ${INVOKER_HOME} for user ${INVOKER}...${RESET}"

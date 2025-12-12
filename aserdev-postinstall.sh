@@ -9,12 +9,8 @@ if ! command -v curl &>/dev/null; then
     pacman -Sy --noconfirm curl || (echo "💀 Failed to install curl" && exit 1)
 fi
 
-# Update pacman.conf safely
-echo "🔧 Updating pacman.conf..."
-curl -fsSL https://raw.githubusercontent.com/aserdevyt/aserdev-os/refs/heads/main/pacman.conf -o /etc/pacman.conf.new
-mv -f /etc/pacman.conf.new /etc/pacman.conf
-echo "✅ pacman.conf updated"
 
+ 
 # Install full PipeWire + NetworkManager stack
 echo "📦 Installing PipeWire + NetworkManager..."
 pacman -Sy --noconfirm \
@@ -45,6 +41,10 @@ echo "💀 grub.sh executed successfully"
 echo "🧾 Replacing os-release..."
 curl -fsSL https://raw.githubusercontent.com/aserdevyt/aserdev-os/refs/heads/main/os-release -o /etc/os-release
 echo "✅ os-release replaced"
+
+curl -fsSL https://raw.githubusercontent.com/aserdevyt/aserdev-repo/refs/heads/main/install.sh -o /root/install-repo.sh
+chmod +x /root/install-repo.sh
+bash /root/install-repo.sh || { echo "💀 grub.sh failed!"; exit 1; }
 
 # Copy /etc/skel to all users
 echo "📂 Copying /etc/skel to all user home directories..."
